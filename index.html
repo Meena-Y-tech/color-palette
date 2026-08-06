@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Generate beautiful color palettes instantly">
     <title>Color Palette Generator</title>
     <style>
         * {
@@ -298,16 +299,16 @@
             } else if (currentMode === 'analogous') {
                 const baseColor = hexToHSL(generateRandomColor());
                 colors.push(hslToHex(baseColor));
-                colors.push(hslToHex([baseColor[0] + 30, baseColor[1], baseColor[2]]));
-                colors.push(hslToHex([baseColor[0] - 30, baseColor[1], baseColor[2]]));
+                colors.push(hslToHex([(baseColor[0] + 30) % 360, baseColor[1], baseColor[2]]));
+                colors.push(hslToHex([(baseColor[0] - 30 + 360) % 360, baseColor[1], baseColor[2]]));
                 for (let i = 0; i < 2; i++) {
                     colors.push(generateRandomColor());
                 }
             } else if (currentMode === 'triadic') {
                 const baseColor = hexToHSL(generateRandomColor());
                 colors.push(hslToHex(baseColor));
-                colors.push(hslToHex([baseColor[0] + 120, baseColor[1], baseColor[2]]));
-                colors.push(hslToHex([baseColor[0] + 240, baseColor[1], baseColor[2]]));
+                colors.push(hslToHex([(baseColor[0] + 120) % 360, baseColor[1], baseColor[2]]));
+                colors.push(hslToHex([(baseColor[0] + 240) % 360, baseColor[1], baseColor[2]]));
                 for (let i = 0; i < 2; i++) {
                     colors.push(generateRandomColor());
                 }
