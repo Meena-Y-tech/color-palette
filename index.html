@@ -256,7 +256,7 @@
         </div>
 
         <div class="stats">
-            <p>💡 Click any color to copy its hex code</p>
+            <p>💡 Click any color to copy its hex code · Press Space for a new palette</p>
         </div>
     </div>
 
@@ -282,54 +282,41 @@
         // Copy all button
         document.getElementById('copyAllBtn').addEventListener('click', copyAllAsCSS);
 
+        function clamp(n) {
+            return Math.max(0, Math.min(100, n));
+        }
+
+        // Nice-looking random base: avoids muddy/neon extremes
+        function randomHSL() {
+            return [
+                Math.floor(Math.random() * 360),
+                55 + Math.floor(Math.random() * 30),
+                45 + Math.floor(Math.random() * 20)
+            ];
+        }
+
+        // Shift hue (wraps 0-360) and lightness (clamped 0-100)
+        function shift(hsl, dh, dl = 0) {
+            return [(hsl[0] + dh + 360) % 360, hsl[1], clamp(hsl[2] + dl)];
+        }
+
         function generatePalette() {
-            colors = [];
+            let hsls = [];
+            const base = randomHSL();
 
             if (currentMode === 'random') {
-                for (let i = 0; i < 5; i++) {
-                    colors.push(generateRandomColor());
-                }
+                for (let i = 0; i < 5; i++) hsls.push(randomHSL());
             } else if (currentMode === 'complementary') {
-                const baseColor = generateRandomColor();
-                colors.push(baseColor);
-                colors.push(complementaryColor(baseColor));
-                for (let i = 0; i < 3; i++) {
-                    colors.push(generateRandomColor());
-                }
+                const comp = shift(base, 180);
+                hsls = [shift(base, 0, -20), base, shift(base, 0, 20), comp, shift(comp, 0, 20)];
             } else if (currentMode === 'analogous') {
-                const baseColor = hexToHSL(generateRandomColor());
-                colors.push(hslToHex(baseColor));
-                colors.push(hslToHex([(baseColor[0] + 30) % 360, baseColor[1], baseColor[2]]));
-                colors.push(hslToHex([(baseColor[0] - 30 + 360) % 360, baseColor[1], baseColor[2]]));
-                for (let i = 0; i < 2; i++) {
-                    colors.push(generateRandomColor());
-                }
+                hsls = [shift(base, -60), shift(base, -30), base, shift(base, 30), shift(base, 60)];
             } else if (currentMode === 'triadic') {
-                const baseColor = hexToHSL(generateRandomColor());
-                colors.push(hslToHex(baseColor));
-                colors.push(hslToHex([(baseColor[0] + 120) % 360, baseColor[1], baseColor[2]]));
-                colors.push(hslToHex([(baseColor[0] + 240) % 360, baseColor[1], baseColor[2]]));
-                for (let i = 0; i < 2; i++) {
-                    colors.push(generateRandomColor());
-                }
+                hsls = [base, shift(base, 120), shift(base, 240), shift(base, 0, 20), shift(base, 0, -20)];
             }
 
+            colors = hsls.map(hslToHex);
             renderPalette();
-        }
-
-        function generateRandomColor() {
-            const letters = '0123456789ABCDEF';
-            let color = '#';
-            for (let i = 0; i < 6; i++) {
-                color += letters[Math.floor(Math.random() * 16)];
-            }
-            return color;
-        }
-
-        function complementaryColor(hexColor) {
-            const hsl = hexToHSL(hexColor);
-            hsl[0] = (hsl[0] + 180) % 360;
-            return hslToHex(hsl);
         }
 
         function hexToHSL(hex) {
@@ -412,26 +399,45 @@
                         <div class="color-rgb">${hexToRGB(color)}</div>
                     </div>
                 `;
+                card.tabIndex = 0;
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-label', `Copy ${color}`);
                 card.addEventListener('click', () => copyToClipboard(color));
+                card.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') copyToClipboard(color);
+                });
                 container.appendChild(card);
             });
         }
 
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                showFeedback(`Copied ${text}`);
-            });
+        async function writeClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (e) {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0';
+                document.body.appendChild(ta);
+                ta.select();
+                let ok = false;
+                try { ok = document.execCommand('copy'); } catch (err) {}
+                ta.remove();
+                return ok;
+            }
         }
 
-        function copyAllAsCSS() {
+        async function copyToClipboard(text) {
+            const ok = await writeClipboard(text);
+            showFeedback(ok ? `Copied ${text}` : 'Copy failed, select manually');
+        }
+
+        async function copyAllAsCSS() {
             const cssVariables = colors
                 .map((color, i) => `--color-${i + 1}: ${color};`)
                 .join('\n');
-            
-            const css = `:root {\n${cssVariables}\n}`;
-            navigator.clipboard.writeText(css).then(() => {
-                showFeedback('CSS variables copied!');
-            });
+            const ok = await writeClipboard(`:root {\n${cssVariables}\n}`);
+            showFeedback(ok ? 'CSS variables copied!' : 'Copy failed');
         }
 
         function showFeedback(message) {
@@ -440,6 +446,14 @@
             feedback.classList.add('show');
             setTimeout(() => feedback.classList.remove('show'), 2000);
         }
+
+        // Spacebar = new palette (skip when a button is focused, it handles space itself)
+        document.addEventListener('keydown', e => {
+            if (e.code === 'Space' && e.target.tagName !== 'BUTTON') {
+                e.preventDefault();
+                generatePalette();
+            }
+        });
 
         // Generate initial palette on load
         generatePalette();
